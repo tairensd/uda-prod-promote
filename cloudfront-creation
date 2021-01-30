@@ -1,0 +1,1 @@
+[1]   Exit 252                aws cloudformations deploy --template-file cloudfront.yml --stack-name production-distro --parameter-overrides PipelineID="prod-promote-tai-base" --tags project=udapeople

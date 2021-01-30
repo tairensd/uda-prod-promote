@@ -1,0 +1,64 @@
+version: 2.1
+jobs:
+  create_and_deploy_front_end:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - checkout
+      - run: |
+          aws cloudformation deploy \
+            --template-file bucket.yml \
+            --stack-name "${CIRCLE_WORKFLOW_ID}" \
+            --parameter-overrides NAME="${CIRCLE_WORKFLOW_ID}"
+      - run: aws s3 sync . s3://"${CIRCLE_WORKFLOW_ID}" --delete
+
+  promote_to_production:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - checkout
+      - run: |
+          aws cloudformation deploy \
+            --template-file cloudformation.yml \
+            --stack-name cloudfront \
+            --parameter-overrides PipelineID="${CIRCLE_WORKFLOW_ID}"
+
+  get_last_deployment_id:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - run: |
+          aws cloudformation \
+            list-exports --query "Exports[?Name==\`PipelineID\`].Value" \
+            --no-paginate --output text >> ~/last_id
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - "last_id"
+  
+  clean_up_old_front_end:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run: |
+          cat ~/last_id | aws s3 rm "s3://${1}" --recursive
+      - run: |
+          cat ~/last_id | aws cloudformation delete-stack --stack-name "${1}"
+
+workflows:
+  default:
+    jobs:
+      - create_and_deploy_front_end
+      - promote_to_production:
+          requires:
+              - create_and_deploy_front_end
+#      - get_last_deployment_id
+#      - hold:
+#          type: approval
+#          requires:
+#            - get_last_deployment_id
+#      - clean_up_old_front_end:
+#          requires:
+#            - hold
