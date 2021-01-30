@@ -31,18 +31,18 @@ jobs:
           aws cloudformation \
             list-exports --query "Exports[?Name==\`PipelineID\`].Value" \
             --no-paginate --output text >> ~/last_id
-      - persist_to_workspace:
-          root: ~/
+      - save_cache:
+          key: id-{{ .Branch }}-${CIRCLE_WORKFLOW_ID}
           paths:
-            - "last_id"
+            - ~/last_id
       - run: cat ~/last_id
   
   clean_up_old_front_end:
     docker:
       - image: amazon/aws-cli
     steps:
-      - attach_workspace:
-          at: ~/
+      - restore_cache:
+          key: id-{{ .Branch }}-${CIRCLE_WORKFLOW_ID}
       - run: |
           cat ~/last_id | aws s3 rm "s3://${1}" --recursive
       - run: |
@@ -55,7 +55,9 @@ workflows:
       - promote_to_production:
           requires:
               - create_and_deploy_front_end
-      - get_last_deployment_id
+      - get_last_deployment_id:
+          requires:
+            - promote_to_production
       - hold:
           type: approval
           requires:
