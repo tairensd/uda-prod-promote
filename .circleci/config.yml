@@ -35,6 +35,7 @@ jobs:
           root: ~/
           paths:
             - "last_id"
+      - run: cat ~/last_id
   
   clean_up_old_front_end:
     docker:
@@ -43,9 +44,9 @@ jobs:
       - attach_workspace:
           at: ~/
       - run: |
-          cat ~/last_id | aws s3 rm "s3://cool-${1}" --recursive
+          cat ~/last_id | aws s3 rm "s3://${1}" --recursive
       - run: |
-          cat ~/last_id | aws cloudformation delete-stack --stack-name "cool-${1}"
+          cat ~/last_id | aws cloudformation delete-stack --stack-name "${1}"
 
 workflows:
   default:
@@ -54,11 +55,11 @@ workflows:
       - promote_to_production:
           requires:
               - create_and_deploy_front_end
-#      - get_last_deployment_id
-#      - hold:
-#          type: approval
-#          requires:
-#            - get_last_deployment_id
-#      - clean_up_old_front_end:
-#          requires:
-#            - hold
+      - get_last_deployment_id
+      - hold:
+          type: approval
+          requires:
+            - get_last_deployment_id
+      - clean_up_old_front_end:
+          requires:
+            - hold
